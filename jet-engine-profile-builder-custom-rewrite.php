@@ -17,9 +17,12 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 class JEPB_Custom_Rewrite {
+
+    private $found_data = [];
     
     public function __construct() {
         add_action( 'parse_request', [ $this, 'setup_props' ] );
+        add_action( 'parse_query', [ $this, 'setup_query' ] );
         add_filter( 'jet-engine/profile-builder/rewrite-rules', [ $this, 'rewrite_subpages' ], 10, 2 );
         add_filter( 'jet-engine/profile-builder/subpage-url', [ $this, 'rewrite_render_urls' ], 10, 5 );
     }
@@ -94,7 +97,12 @@ class JEPB_Custom_Rewrite {
             return;
         }
 
-        set_query_var( 'name', $user_page->post_name );
+        $this->found = [
+            'page' => $user_page->post_name,
+            'user' => $requested_user,
+        ];
+
+        /*set_query_var( 'name', $user_page->post_name );
         set_query_var( 'pagename', $user_page->post_name );
         set_query_var( $this->module()->rewrite->page_var, 'single_user_page' );
         set_query_var( $this->module()->rewrite->subpage_var, null );
@@ -107,7 +115,39 @@ class JEPB_Custom_Rewrite {
             $this->module()->rewrite->page_var => 'single_user_page',
             $this->module()->rewrite->subpage_var => null,
             $this->module()->rewrite->user_var => $requested_user,
+        ];*/
+
+    }
+
+    public function setup_query( &$query ) {
+       
+        global $wp;
+
+        if ( empty( $this->found ) ) {
+            return;
+        }
+
+        status_header( 200 );
+
+        $query->is_404  = false;
+        $query->is_page = true;
+
+        $query->set( 'pagename', $this->found['page'] );
+        $query->set( 'name', $this->found['page'] );
+        $query->set( $this->module()->rewrite->page_var, 'single_user_page' );
+        $query->set( $this->module()->rewrite->subpage_var, null );
+        $query->set( $this->module()->rewrite->user_var, $this->found['user'] );
+
+        $wp->request = $this->found['page'];
+        $wp->query_vars = [
+            'page' => '',
+            'name' => $this->found['page'],
+            $this->module()->rewrite->page_var => 'single_user_page',
+            $this->module()->rewrite->subpage_var => null,
+            $this->module()->rewrite->user_var => $this->found['user'],
         ];
+
+        remove_action( 'parse_query', [ $this, 'setup_query' ] );
 
     }
 
